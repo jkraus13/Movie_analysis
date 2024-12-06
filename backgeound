@@ -1,0 +1,9 @@
+This project analyzes IMDb movie data to uncover patterns in ratings and trends by genre, rating, and revenue.
+Top-Rated Movies: Identifies the highest-rated movies and their attributes.
+Genre Analysis: Explores average ratings and revenues across genres.
+Trends Over Time: Analyzes how movie ratings and revenues have changed over the years.
+Correlation Insights: Examines relationships between ratings, runtime, votes, and revenue.
+
+Technologies Used
+Programming Language: R
+Libraries: tidyverse, ggplot2, dplyr, viridis
