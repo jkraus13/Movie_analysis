@@ -1,0 +1,200 @@
+---
+title: "Movie_Analysis"
+output: html_document
+date: "2024-12-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(viridis)
+library(devtools)
+
+
+```
+
+```{r}
+
+movie_data <- read_csv("~/Documents/movie_analysis/data/IMDB-Movie-Data.csv")
+
+view(movie_data)
+
+colnames(movie_data)[colnames(movie_data) == "Revenue (Millions)"] <- "revenue"
+
+
+```
+
+
+
+Movies In order of Ranking By Horror and finding the rank based on revenue.
+The intercept is the predicted rank when the revenue is zero
+Slope: the change in Rank for every million dollar increase in Revenue
+When the intercept is 0, the predicted rank is 605.05
+For every additional 1 million dollars in revenue, the movies ranke improves by 1.13 units
+```{r}
+
+horror_movies_ranking <- movie_data %>%
+  filter(Genre == "Horror,Thriller") %>%
+  arrange(Rank) %>%
+  select(Rank,Title, revenue) %>%
+  filter(!is.na(revenue))
+
+
+view(horror_movies_ranking)
+
+ggplot(horror_movies_ranking, aes(x = Rank, y = revenue)) +
+  geom_point(color = "blue", size = 1) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Revenue vs Rank for Horror Thriller Movies",
+       x = "Rank",
+       y = "Revenue (Millions)") +
+  theme_minimal()
+
+```
+
+
+Movies In order of ranking by Action
+```{r}
+
+action_movie_ranking <- movie_data %>%
+ filter(Genre == "Action,Crime,Drama")  %>%
+  arrange(Rank)
+
+view(action_movie_ranking)
+
+```
+
+
+Highest Revenue movies
+```{r}
+highest_rev <- movie_data %>%
+  arrange(-revenue) %>%
+  relocate(revenue, .after = Rank) %>%
+  select(-Description, -Actors, -`Runtime (Minutes)`, -Votes, -Metascore)
+
+highest_rev
+
+average_revenue_by_genre <- highest_rev %>%
+  filter(!is.na(revenue)) %>%  
+  separate_rows(Genre, sep = ",") %>%  
+  group_by(Genre) %>%
+  summarize(avg_revenue = mean(revenue, na.rm = TRUE)) %>%  
+  arrange(desc(avg_revenue))  
+
+average_revenue_by_genre
+
+ggplot(average_revenue_by_genre, aes(x = Genre, y = avg_revenue, fill = Genre)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  scale_fill_viridis_d()+
+  labs(
+    title = "Average Revenue (Millions) per Genre",
+    caption = "Based on IMBD Movie Data",
+    y = "Average Revenue (Millions)"
+  ) + 
+  theme_minimal()
+```
+
+
+Is there a signifcant difference in average revenue between the top genres?
+
+```{r}
+
+
+top_two_rev <- average_revenue_by_genre %>%
+  arrange(-avg_revenue) %>%
+  top_n(2) %>%
+  left_join(movie_data %>% 
+              separate_rows(Genre, sep = ",") %>%
+              group_by(Genre) %>%
+              summarize(
+                sd = sd(revenue, na.rm = TRUE),  
+                n = n()  # Sample size
+              ), by = "Genre")
+
+print(top_two_rev)
+
+  
+
+xbar1 <- top_two_rev$avg_revenue[1]
+xbar2 <- top_two_rev$avg_revenue[2]
+s1 <- top_two_rev$sd[1]
+s2 <- top_two_rev$sd[2]
+n1 <- top_two_rev$n[1]
+n2 <- top_two_rev$n[2]
+
+
+w_numer <- (s1^2/n1 + s2^2/n2)^2
+w_denom <- (s1^4/(n1^2*(n1-1)) + s2^4/(n2^2*(n2-1)))
+w <- w_numer / w_denom
+
+pt_est <- xbar1 - xbar2
+se <- sqrt(s1^2/n1 + s2^2/n2)
+
+cv <- qt(0.95, df = w)
+c(pt_est - cv*se, pt_est + cv*se)
+
+```
+
+The confidence interval is 5.190749 68.902011. The interval suggests that the difference in average revenue between the two genres lies between 
+5.19 and 68.90 million dollars. Because the interval is positive, it indicates the the Genre: Animation is likely to have a signficant higher revenue comapred to the Genre: Avdventure. The Interval also does not include zero, which indicates that it is statistically significant at the confeince level 95%.However, dthe sample size for animation is signifcantlly smaller than the adventure sample size. This can indicate the the estimated average revenue for this genre may not fully represent its average revenue in the population.
+
+
+
+Movie Ratings Analysis
+```{r}
+highest_rate <- movie_data %>%
+  arrange(-Rating) %>%
+  relocate(Rating, .after = Rank) %>%
+  select(-Description, -Actors, -`Runtime (Minutes)`, -Votes, -Metascore)
+
+highest_rate
+
+
+over_8_5_rate <- highest_rate %>%
+  filter(Rating > 8.5) %>%
+  arrange(-Rating)
+
+print(over_8_5_rate)
+
+average_rating_by_genre <- highest_rate %>%
+  separate_rows(Genre, sep = ",") %>%
+  group_by(Genre) %>%
+  summarize(avg_rating = mean(Rating, na.rm = TRUE)) %>%
+  arrange(-avg_rating)
+
+average_rating_by_genre
+
+
+ggplot(average_rating_by_genre, aes(x = Genre, y = avg_rating, fill = Genre)) +
+  geom_bar(stat = "identity") +
+  scale_fill_viridis_d()+
+  coord_flip() +
+  labs(
+    title = "Average Rating by Genre", 
+    x = "Genre",
+    y = "Average Rating")
+
+```
+
+How have ratings changed over the years?
+```{r}
+rating_trends <- highest_rate %>%
+  group_by(Year) %>%
+  summarize(avg_rating = mean(Rating, na.rm = TRUE)) 
+rating_trends
+
+ggplot(rating_trends, aes(x = Year, y = avg_rating)) +
+  geom_line(color = "blue") +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red")+
+    labs(title = "Average Movie Ratings Over Time", x = "Year", y = "Average Rating")
+
+
+ggplot(highest_rate, aes(x = Rating, y = revenue)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Rating vs Revenue", x = "Rating", y = "Revenue (Millions)")
+```
+
